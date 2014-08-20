@@ -1,27 +1,41 @@
-
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
+// ReSharper disable InconsistentNaming
 namespace Mvc.JQuery.Datatables
 {
     public class DataTablesData
     {
-        public int iTotalRecords { get; set; }
-        public int iTotalDisplayRecords { get; set; }
-        public int sEcho { get; set; }
-        public object[] aaData { get; set; }
+        public DataTablesData()
+        {
+        }
+
+        public DataTablesData(DataTablesLegacyData legacyData)
+        {
+            draw = legacyData.sEcho;
+            recordsTotal = legacyData.iTotalRecords;
+            recordsFiltered = legacyData.iTotalDisplayRecords;
+            data = legacyData.aaData;
+        }
+
+        public int draw { get; set; }
+        public int recordsTotal { get; set; }
+        public int recordsFiltered { get; set; }
+        public object[] data { get; set; }
+
+        public string error { get; set; }
 
         public DataTablesData Transform<TData, TTransform>(Func<TData, TTransform> transformRow)
         {
-            var data = new DataTablesData 
+            var res = new DataTablesData
             {
-                aaData = aaData.Cast<TData>().Select(transformRow).Cast<object>().ToArray(),
-                iTotalDisplayRecords = iTotalDisplayRecords,
-                iTotalRecords = iTotalRecords,
-                sEcho = sEcho
+                draw = draw,
+                recordsTotal = recordsTotal,
+                recordsFiltered = recordsFiltered,
+                data = data.Cast<TData>().Select(transformRow).Cast<object>().ToArray(),
+                error = error,
             };
-            return data;
+            return res;
         }
     }
 

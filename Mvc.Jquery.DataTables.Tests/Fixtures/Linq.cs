@@ -37,7 +37,7 @@ namespace Mvc.JQuery.Datatables.Tests
         public virtual int[] ExecuteParams(DataTablesParam dataTablesParam)
         {
             var result = new DataTablesResult<SomeModel>(SomeModelQueryable, dataTablesParam);
-            var data = result.Data;
+            var data = result.LegacyData;
             return data.aaData.Select(row => ((SomeModel)row).Id).ToArray();
         }
 
@@ -49,7 +49,7 @@ namespace Mvc.JQuery.Datatables.Tests
                 m => new { 
                     FriendlyWhen = m.When.ToShortDateString(),
                 });
-            var data = result.Data;
+            var data = result.LegacyData;
             return data.aaData.Select(d=>Convert.ToInt32(((IList)d)[0])).ToArray();
         }
 

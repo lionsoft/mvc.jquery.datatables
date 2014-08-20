@@ -57,7 +57,7 @@ namespace Mvc.JQuery.Datatables.Tests
             dataTablesParam.sSearchColumns[col] = searchString;
             var result = new DataTablesResult<SomeModel>(queryable, dataTablesParam);
 
-            var data = result.Data;
+            var data = result.LegacyData;
             Assert.AreEqual(returnsResult, data.iTotalDisplayRecords > 0);
         }
 

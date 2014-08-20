@@ -1,18 +1,16 @@
-using System.Linq.Expressions;
 using System.Web;
 using System.Web.Script.Serialization;
-using Mvc.JQuery.Datatables.DynamicLinq;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Web.Mvc;
 
 namespace Mvc.JQuery.Datatables
 {
     public class DataTablesResult 
     {
+
+
         /// <typeparam name="TSource"></typeparam>
         /// <typeparam name="TTransform"></typeparam>
         /// <param name="q">A queryable for the data. The properties of this can be marked up with [DataTablesAttribute] to control sorting/searchability/visibility</param>
@@ -22,11 +20,34 @@ namespace Mvc.JQuery.Datatables
         public static DataTablesResult<TSource> Create<TSource, TTransform>(IQueryable<TSource> q, DataTablesParam dataTableParam, Func<TSource, TTransform> transform)
         {
             var result = new DataTablesResult<TSource>(q, dataTableParam);
-            result.Data = result.Data
-                .Transform<TSource, Dictionary<string, object>>(row => TransformTypeInfo<TTransform>.MergeToDictionary(transform, row))
-                .Transform<Dictionary<string, object>, Dictionary<string, object>>(StringTransformers.TransformDictionary)
-                .Transform<Dictionary<string, object>, object[]>(d => d.Values.ToArray());
-                
+            if (dataTableParam.UseDataArray)
+            {
+                result.LegacyData = result.LegacyData
+                    .Transform<TSource, Dictionary<string, object>>(row => TransformTypeInfo<TTransform>.MergeToDictionary(transform, row))
+                    .Transform<Dictionary<string, object>, Dictionary<string, object>>(StringTransformers.TransformDictionary)
+                    .Transform<Dictionary<string, object>, object[]>(d => d.Values.ToArray());
+            }
+            else
+            {
+                var transformData = result.LegacyData.Transform(transform).aaData;
+                for (var i = 0; i < result.LegacyData.aaData.Length; i++)
+                {
+                    var tb = AnonimousTypeBuilder.CreateTypeBuilder();
+                    var data = result.LegacyData.aaData[i];
+                    foreach (var pi in data.GetType().GetProperties().Union(transformData[i].GetType().GetProperties()))
+                    {
+                        tb.AddProperty(pi.Name, typeof(string));
+                    }
+                    var transData = Activator.CreateInstance(tb.CreateType());
+                    foreach (var pi1 in transData.GetType().GetProperties())
+                    {
+                        var pi = data.GetType().GetProperty(pi1.Name);
+                        var piT = transformData[i].GetType().GetProperty(pi1.Name);
+                        pi1.SetValue(transData, ((piT == null ? pi.GetValue(data) : piT.GetValue(transformData[i])) ?? "").ToString());
+                    }
+                    result.LegacyData.aaData[i] = transData;
+                }
+            }
             return result;
         }
 
@@ -34,11 +55,13 @@ namespace Mvc.JQuery.Datatables
         public static DataTablesResult<TSource> Create<TSource>(IQueryable<TSource> q, DataTablesParam dataTableParam)
         {
             var result = new DataTablesResult<TSource>(q, dataTableParam);
-
-            result.Data = result.Data
-                .Transform<TSource, Dictionary<string, object>>(DataTablesTypeInfo<TSource>.ToDictionary)
-                .Transform<Dictionary<string, object>, Dictionary<string, object>>(StringTransformers.TransformDictionary)
-                .Transform<Dictionary<string, object>, object[]>(d => d.Values.ToArray()); ;
+            if (dataTableParam.UseDataArray)
+            {
+                result.LegacyData = result.LegacyData
+                    .Transform<TSource, Dictionary<string, object>>(DataTablesTypeInfo<TSource>.ToDictionary)
+                    .Transform<Dictionary<string, object>, Dictionary<string, object>>(StringTransformers.TransformDictionary)
+                    .Transform<Dictionary<string, object>, object[]>(d => d.Values.ToArray()); ;
+            }            
             return result;
         }
 
@@ -61,34 +84,23 @@ namespace Mvc.JQuery.Datatables
 
     }
 
-    public class TransformTypeInfo<TTransform>
-    {
-        public static Dictionary<string, object> MergeToDictionary<TInput>(Func<TInput, TTransform> transformInput, TInput tInput)
-        {
-            var transform = transformInput(tInput);
-            var dict = DataTablesTypeInfo<TInput>.ToDictionary(tInput);
-            foreach (var propertyInfo in typeof(TTransform).GetProperties())
-            {
-                dict[propertyInfo.Name] = propertyInfo.GetValue(transform, null);
-            }
-            return dict;
-        }
-    }
-
 
     public class DataTablesResult<TSource> : ActionResult
     {
 
-        public DataTablesData Data { get; set; }
+        public DataTablesLegacyData LegacyData { get; set; }
+        public DataTablesData Data { get { return new DataTablesData(LegacyData); } }
 
         internal DataTablesResult(IQueryable<TSource> q, DataTablesParam dataTableParam)
         {
-            this.Data = GetResults(q, dataTableParam);
+            LegacyData = GetResults(q, dataTableParam);
         }
-        internal DataTablesResult(DataTablesData data)
+/*
+        internal DataTablesResult(DataTablesLegacyData data)
         {
-            this.Data = data;
+            LegacyData = data;
         }
+*/
 
         public override void ExecuteResult(ControllerContext context)
         {
@@ -97,10 +109,13 @@ namespace Mvc.JQuery.Datatables
             HttpResponseBase response = context.HttpContext.Response;
 
             var scriptSerializer = new JavaScriptSerializer();
-            response.Write(scriptSerializer.Serialize(this.Data));
+            if (LegacyData.IsLegacyFormat)
+                response.Write(scriptSerializer.Serialize(LegacyData));
+            else
+                response.Write(scriptSerializer.Serialize(Data));
         }
 
-        DataTablesData GetResults(IQueryable<TSource> data, DataTablesParam param)
+        DataTablesLegacyData GetResults(IQueryable<TSource> data, DataTablesParam param)
         {
             var totalRecords = data.Count(); //annoying this, as it causes an extra evaluation..
 
@@ -113,30 +128,18 @@ namespace Mvc.JQuery.Datatables
 
             var page = (param.iDisplayLength <= 0 ? filteredData : filteredData.Take(param.iDisplayLength)).ToArray();
 
-            var result = new DataTablesData
+            var result = new DataTablesLegacyData
             {
                 iTotalRecords = totalRecords,
                 iTotalDisplayRecords = filteredData.Count() + param.iDisplayStart,
                 sEcho = param.sEcho,
-                aaData = page.Cast<object>().ToArray()
+                aaData = page.Cast<object>().ToArray(),
+                IsLegacyFormat = param.IsLegacyFormat,
             };
 
             return result;
         }
 
         
-    }
-
-    public class ColInfo
-    {
-        public string Name { get; set; }
-        public Type Type { get; set; }
-
-        public ColInfo(string name, Type propertyType)
-        {
-            Name = name;
-            Type = propertyType;
-
-        }
     }
 }

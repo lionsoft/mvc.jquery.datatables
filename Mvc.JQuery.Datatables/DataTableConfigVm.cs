@@ -1,62 +1,12 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Net.Mime;
 using System.Web.Routing;
 using System.Web.Script.Serialization;
-using Mvc.JQuery.Datatables.Models;
 using Mvc.JQuery.Datatables.Serialization;
 using Newtonsoft.Json;
 
 namespace Mvc.JQuery.Datatables
 {
-    public class FilterDef : Hashtable
-    {
-        internal object[] values { set { this["values"] = value; } }
-        internal string type { set { this["type"] = value; } }
-
-
-        public FilterDef(Type t)
-        {
-            SetDefaultValuesAccordingToColumnType(t);
-        }
-
-        private static List<Type> DateTypes = new List<Type> { typeof(DateTime), typeof(DateTime?), typeof(DateTimeOffset), typeof(DateTimeOffset?) };
-
-
-        private void SetDefaultValuesAccordingToColumnType(Type t)
-        {
-            if (t==null)
-            {
-                type = "null";
-            }
-            else if (DateTypes.Contains(t))
-            {
-                type = "date-range";
-            }
-            else if (t == typeof (bool))
-            {
-                type = "select";
-                values = new object[] {"True", "False"};
-            }
-            else if (t == typeof (bool?))
-            {
-                type = "select";
-                values = new object[] {"True", "False", "null"};
-            }
-            else if (t.IsEnum)
-            {
-                type = "checkbox";
-                values = Enum.GetNames(t).Cast<object>().ToArray();
-            }
-            else
-            {
-                type = "text";
-            }
-        }
-    }
-
     public class DataTableConfigVm
     {
         public bool HideHeaders { get; set; }
@@ -73,11 +23,13 @@ namespace Mvc.JQuery.Datatables
         public DataTableConfigVm(string id, string ajaxUrl, IEnumerable<ColDef> columns)
         {
             AjaxUrl = ajaxUrl;
-            this.Id = id;
-            this.Columns = columns;
-            this.ShowSearch = true;
-            this.ShowPageSizes = true;
-            this.TableTools = true;
+            Id = id;
+            Columns = columns;
+            ShowSearch = true;
+            ShowPageSizes = true;
+            TableTools = true;
+            UseLegacyFormat = true;
+            UseDataArray = true;
             ColumnFilterVm = new ColumnFilterSettingsVm(this);
         }
 
@@ -144,9 +96,27 @@ namespace Mvc.JQuery.Datatables
 
         public string DrawCallback { get; set; }
 
+        /// <summary>
+        /// Если <c>true</c> - используется формат передачи параметров версии 1.9.x.
+        /// Если <c>false</c> - используется формат передачи параметров версии 1.10.x.
+        /// Так как <see cref="ColumnFilter"/> сейчас работает только со старым форматом, в случае, если <see cref="ColumnFilter"/> равен <c>true</c> 
+        /// значение <see cref="UseLegacyFormat"/> будет всегда <c>true</c>.
+        /// </summary>
+        public bool UseLegacyFormat
+        {
+            get { return _useLegacyFormat || ColumnFilter; }
+            set { _useLegacyFormat = value; }
+        }
+
+        /// <summary>
+        /// Если <c>true</c> - используется формат передачи данных по умолчанию в виде массива строк в порядке следования полей.
+        /// Если <c>false</c> - данные передаются в виде списка объектов.
+        /// </summary>
+        public bool UseDataArray { get; set; }
 
         private bool _columnFilter;
- 
+        private bool _useLegacyFormat;
+
 
         public class _FilterOn<TTarget>
         {
@@ -289,26 +259,4 @@ namespace Mvc.JQuery.Datatables
             return new Dictionary<string, object>(new RouteValueDictionary(obj));
         }
     }
-
-    public class ColumnFilterSettingsVm : Hashtable
-    {
-        private readonly DataTableConfigVm _vm;
-
-        public ColumnFilterSettingsVm(DataTableConfigVm vm)
-        {
-            _vm = vm;
-            this["bUseColVis"] = true;
-            this["sPlaceHolder"] = "head:after";
-        }
-
-        public override string ToString()
-        {
-            var noColumnFilter = new FilterDef(null);
-            this["aoColumns"] = _vm.Columns
-                //.Where(c => c.Visible || c.Filter["sSelector"] != null)
-                .Select(c => c.Searchable?c.Filter:noColumnFilter).ToArray();
-            return new JavaScriptSerializer().Serialize(this);
-        }
-    }
-
 }

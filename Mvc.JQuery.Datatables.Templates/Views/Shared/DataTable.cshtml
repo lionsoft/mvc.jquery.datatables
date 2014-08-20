@@ -47,7 +47,10 @@
             "sDom": '@Html.Raw(Model.Dom)',
             "aLengthMenu": [[5, 10, 25, 50, -1], [5, 10, 25, 50, "All"]],
             "bAutoWidth": @Model.AutoWidth.ToString().ToLowerInvariant(),
+
             "sAjaxSource": "@Html.Raw(Model.AjaxUrl)", @Html.Raw(Model.TableTools ? "\"oTableTools\" : { \"sSwfPath\": \"//cdn.datatables.net/tabletools/2.2.1/swf/copy_csv_xls_pdf.swf\" }," : "")
+
+
             "fnServerData": function(sSource, aoData, fnCallback) {
                 $.ajax({
                     "dataType": 'json',
@@ -58,25 +61,25 @@
                 });
             },
             "aoColumnDefs" : @Html.Raw(Model.ColumnDefsString)
-                @Html.Raw(!string.IsNullOrWhiteSpace(Model.JsOptionsString) ? ", " + Model.JsOptionsString : "")
-            @if (!string.IsNullOrEmpty(Model.Language))
+        @Html.Raw(!string.IsNullOrWhiteSpace(Model.JsOptionsString) ? ", " + Model.JsOptionsString : "")
+        @if (!string.IsNullOrEmpty(Model.Language))
             {
                 <text>
                     ,"oLanguage": @Html.Raw(@Model.Language)
-                </text>
+        </text>
             }
-            @if (!string.IsNullOrEmpty(Model.DrawCallback))
+        @if (!string.IsNullOrEmpty(Model.DrawCallback))
             {
                 <text>
                     ,"fnDrawCallback": @Html.Raw(Model.DrawCallback)
-                </text>
+        </text>
             }
                     });
-            @if (Model.ColumnFilter)
+    @if (Model.ColumnFilter)
             {
                 <text>
-        dt.columnFilter(@Html.Raw(Model.ColumnFilterVm.ToString()));
-        </text>
+    dt.columnFilter(@Html.Raw(Model.ColumnFilterVm.ToString()));
+    </text>
             }
     })();
 </script>

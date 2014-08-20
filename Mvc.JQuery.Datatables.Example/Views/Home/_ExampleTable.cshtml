@@ -19,6 +19,10 @@
     //vm.JsOptions.Add("iDisplayLength", 25);
     //vm.JsOptions.Add("aLengthMenu", new object[] { new[] {5, 10, 25, 250, -1} , new object[] { 5, 10, 25, 250, "All"} });
 
+    vm.UseLegacyFormat = false;
+    
+    vm.UseDataArray = false;
+    
     vm.JsOptions.Add("fnCreatedRow", new Raw(@"function( nRow, aData, iDataIndex ) {
         $(nRow).attr('data-id', aData[0]);
     }"));
